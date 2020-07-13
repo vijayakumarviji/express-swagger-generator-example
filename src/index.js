@@ -1,8 +1,12 @@
 let express = require('express');
+var bodyParser = require('body-parser')
 let app = express();
 let joi = require('@hapi/joi');
-let { generateSwagger } = require('getswagger')
+let { generateSwagger } = require('getswagger');
 
+app.use(bodyParser.json())
+
+let validateSchema = require('../middlewares/scheme_validator');
 let apiInfos = [
     {
         method: 'post',
@@ -17,20 +21,22 @@ let apiInfos = [
         },
         schema: {
             request: {
-                path: joi.object().keys({
+                params: joi.object().keys({
                     name: joi.string()
                 }),
                 query: joi.object().keys({
                     name: joi.string()
                 }),
                 body: joi.object().keys({
+                    name: joi.string().required()
+                }).required(),
+                headers: joi.object().keys({
                     name: joi.string()
-                }),
-                header: joi.object().keys({
-                    name: joi.string()
-                }),
+                })
             },
-            response: joi.object()
+            response: joi.object().keys({
+                name: joi.string().required()
+            }).required()
         },
         summary: 'Get User',
         tags: ['USER']
@@ -65,40 +71,38 @@ apiInfos.forEach(apiInfo => {
         method,
         apiPath,
         middlewares,
+        schema,
         hasValidation: {
             request: validateRequest = false,
             response: validateResponse = false
         } = {}
     } = apiInfo;
 
-    validateRequest && middlewares.splice(0, 0, (req, res, next) => {
-        console.log('Request validation')
-        next();
-    });
-    middlewares.splice(0, 0, (req, res, next) => {
-        console.log('Entry logger')
-        next();
-    });
-    validateResponse && middlewares.push((req, res, next) => {
-        console.log('Response validation')
-        next();
-    });
-    middlewares.push((req, res, next) => {
-        console.log('Exit logger')
-        next();
-    });
+    validateRequest && middlewares.splice(0, 0, validateSchema(schema.request, 'request'));
+    validateResponse && middlewares.push(validateSchema(schema.response, 'response'));
     app[method](apiPath, ...middlewares);
 })
 
-app.use((req, res, next) => {
-    return res.send({
-        name: 'Vijay2'
-    });
+app.use((req, res   ) => {
+    let response = {
+        code: 200,
+        messageCode: 'Success',
+        data: req.responseData
+    }
+    return res.send(response);
 });
 
 app.use((error, req, res, next) => {
-    console.log('Error handler');
-    return res.sendStatus(400)
+    let response = {
+        code: 500,
+        messageCode: 'Internal_Server_Error'
+    };
+    if (error.isSchemaError) {
+        response.code = 400;
+        response.messageCode = 'Bad_Request';
+        response.message = error.error;
+    }
+    return res.status(response.code).send(response)
 });
 
 app.listen(3000);

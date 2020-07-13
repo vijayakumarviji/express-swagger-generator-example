@@ -11,6 +11,7 @@
   "dependencies": {
     "@hapi/joi": "^17.1.1",
     "express": "^4.17.1",
-    "getswagger": "^1.0.0"
+    "getswagger": "^2.1.0",
+    "lodash": "^4.17.19"
   }
 }
